@@ -1,9 +1,171 @@
-import java.io.*;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.Optional;
 
 /* =========================================================
-   1. DOMINIO DE PRODUCTOS (ENCAPSULAMIENTO)
+   ENUMS
+   ========================================================= */
+
+enum CategoriaProducto {
+    BEBIDA,
+    SNACK
+}
+
+enum ResultadoRegistro {
+    PRODUCTO_REGISTRADO,
+    CODIGO_DUPLICADO,
+    PRODUCTO_INVALIDO,
+    PRECIO_INVALIDO
+}
+
+enum ResultadoReabastecimiento {
+    REABASTECIMIENTO_REALIZADO,
+    PRODUCTO_NO_ENCONTRADO,
+    CANTIDAD_INVALIDA
+}
+
+enum ResultadoEntrega {
+    PRODUCTO_PREPARADO,
+    PRODUCTO_NO_ENCONTRADO,
+    SIN_EXISTENCIAS
+}
+
+enum EstadoCobro {
+    COBRO_REALIZADO,
+    MONTO_INVALIDO,
+    SIN_FONDOS_SUFICIENTES
+}
+
+enum EstadoCompra {
+    VENTA_REALIZADA,
+    PRODUCTO_NO_ENCONTRADO,
+    SIN_EXISTENCIAS,
+    PAGO_INSUFICIENTE,
+    SIN_FONDOS_SUFICIENTES
+}
+
+/* =========================================================
+   CLASES DE RESULTADO Y DTOs
+   ========================================================= */
+
+class ProductoInventario {
+    private final Producto producto;
+    private final double precio;
+    private final int existencias;
+
+    public ProductoInventario(Producto producto, double precio, int existencias) {
+        this.producto = producto;
+        this.precio = precio;
+        this.existencias = existencias;
+    }
+
+    public Producto getProducto() { return producto; }
+    public double getPrecio() { return precio; }
+    public int getExistencias() { return existencias; }
+}
+
+class ResultadoCobro {
+    private final EstadoCobro estado;
+    private final double cambio;
+
+    public ResultadoCobro(EstadoCobro estado, double cambio) {
+        this.estado = estado;
+        this.cambio = cambio;
+    }
+
+    public EstadoCobro getEstado() { return estado; }
+    public double getCambio() { return cambio; }
+}
+
+class ResultadoCompra {
+    private final EstadoCompra estado;
+    private final Producto producto;
+    private final double cambio;
+
+    public ResultadoCompra(EstadoCompra estado, Producto producto, double cambio) {
+        this.estado = estado;
+        this.producto = producto;
+        this.cambio = cambio;
+    }
+
+    public EstadoCompra getEstado() { return estado; }
+    public Producto getProducto() { return producto; }
+    public double getCambio() { return cambio; }
+}
+
+class RegistroProductoDTO {
+    private final String codigo;
+    private final String nombre;
+    private final LocalDate fechaCaducidad;
+    private final CategoriaProducto categoria;
+    private final double precio;
+
+    public RegistroProductoDTO(String codigo, String nombre, LocalDate fechaCaducidad, CategoriaProducto categoria, double precio) {
+        this.codigo = codigo;
+        this.nombre = nombre;
+        this.fechaCaducidad = fechaCaducidad;
+        this.categoria = categoria;
+        this.precio = precio;
+    }
+
+    public String getCodigo() { return codigo; }
+    public String getNombre() { return nombre; }
+    public LocalDate getFechaCaducidad() { return fechaCaducidad; }
+    public CategoriaProducto getCategoria() { return categoria; }
+    public double getPrecio() { return precio; }
+}
+
+class ReabastecimientoDTO {
+    private final String codigo;
+    private final int cantidad;
+
+    public ReabastecimientoDTO(String codigo, int cantidad) {
+        this.codigo = codigo;
+        this.cantidad = cantidad;
+    }
+
+    public String getCodigo() { return codigo; }
+    public int getCantidad() { return cantidad; }
+}
+
+class CompraDTO {
+    private final String codigoProducto;
+    private final double cantidadRecibida;
+
+    public CompraDTO(String codigoProducto, double cantidadRecibida) {
+        this.codigoProducto = codigoProducto;
+        this.cantidadRecibida = cantidadRecibida;
+    }
+
+    public String getCodigoProducto() { return codigoProducto; }
+    public double getCantidadRecibida() { return cantidadRecibida; }
+}
+
+/* =========================================================
+   INTERFACES
+   ========================================================= */
+
+interface Inventario {
+    ResultadoRegistro registrarProducto(Producto producto, double precio);
+    Optional<ProductoInventario> buscarProducto(String codigo);
+    ResultadoReabastecimiento reabastecer(String codigo, int cantidad);
+    ResultadoEntrega despachar(String codigo);
+}
+
+interface Monedero {
+    ResultadoCobro cobrar(double precio, double cantidadRecibida);
+    double consultarFondos();
+}
+
+interface MaquinaDespachadora {
+    ResultadoRegistro registrarProducto(RegistroProductoDTO producto);
+    Optional<ProductoInventario> buscarProducto(String codigo);
+    ResultadoReabastecimiento reabastecer(ReabastecimientoDTO solicitud);
+    ResultadoCompra comprar(CompraDTO solicitud);
+    double consultarFondos();
+}
+
+/* =========================================================
+   CLASES DE DOMINIO E IMPLEMENTACIONES
    ========================================================= */
 
 class Producto {
@@ -19,21 +181,10 @@ class Producto {
         this.categoria = categoria;
     }
 
-    public String getCodigo() {
-        return codigo;
-    }
-
-    public String getNombre() {
-        return nombre;
-    }
-
-    public LocalDate getFechaCaducidad() {
-        return fechaCaducidad;
-    }
-
-    public CategoriaProducto getCategoria() {
-        return categoria;
-    }
+    public String getCodigo() { return codigo; }
+    public String getNombre() { return nombre; }
+    public LocalDate getFechaCaducidad() { return fechaCaducidad; }
+    public CategoriaProducto getCategoria() { return categoria; }
 }
 
 class Bebida extends Producto {
@@ -47,10 +198,6 @@ class Snack extends Producto {
         super(codigo, nombre, fecha, categoria);
     }
 }
-
-/* =========================================================
-   2. IMPLEMENTACION DE INVENTARIO
-   ========================================================= */
 
 class InventarioMemoria implements Inventario {
     private static class Entrada {
@@ -78,7 +225,7 @@ class InventarioMemoria implements Inventario {
                 && p.getFechaCaducidad() != null
                 && p.getCategoria() != null;
     }
-  
+
     public ResultadoRegistro registrarProducto(Producto producto, double precio) {
         if (!productoValido(producto)) {
             return ResultadoRegistro.PRODUCTO_INVALIDO;
@@ -133,10 +280,6 @@ class InventarioMemoria implements Inventario {
     }
 }
 
-/* =========================================================
-   3. IMPLEMENTACION DE MONEDERO
-   ========================================================= */
-
 class MonederoEfectivo implements Monedero {
     private double fondos;
 
@@ -168,10 +311,6 @@ class MonederoEfectivo implements Monedero {
         return fondos;
     }
 }
-
-/* =========================================================
-   4. MAQUINA EXPENDEDORA
-   ========================================================= */
 
 class MaquinaExpendedora implements MaquinaDespachadora {
     private final Inventario inventario;
@@ -283,10 +422,6 @@ class MaquinaExpendedora implements MaquinaDespachadora {
         return monedero.consultarFondos();
     }
 }
-
-/* =========================================================
-   5. CLASE RESULT
-   ========================================================= */
 
 class Result {
     public static MaquinaDespachadora crearMaquina(double fondosIniciales) {
